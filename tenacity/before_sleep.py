@@ -35,32 +35,5 @@ def before_sleep_log(
 ) -> typing.Callable[["RetryCallState"], None]:
     """Before sleep strategy that logs to some logger the attempt."""
 
-    def log_it(retry_state: "RetryCallState") -> None:
-        if retry_state.outcome is None:
-            raise RuntimeError("log_it() called before outcome was set")
-
-        if retry_state.next_action is None:
-            raise RuntimeError("log_it() called before next_action was set")
-
-        if retry_state.outcome.failed:
-            ex = retry_state.outcome.exception()
-            verb, value = "raised", f"{ex.__class__.__name__}: {ex}"
-        else:
-            verb, value = "returned", retry_state.outcome.result()
-
-        fn_name = retry_state.get_fn_name()
-
-        msg = (
-            f"Retrying {fn_name} "
-            f"in {sec_format % retry_state.next_action.sleep} seconds as it {verb} {value}."
-        )
-
-        if exc_info and retry_state.outcome.failed:
-            ex = retry_state.outcome.exception()
-            if ex is not None:
-                tb = "".join(traceback.format_exception(type(ex), ex, ex.__traceback__))
-                msg = f"{msg}\n{tb.rstrip()}"
-
-        logger.log(log_level, msg)
 
     return log_it

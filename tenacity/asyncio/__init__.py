@@ -53,22 +53,6 @@ P = t.ParamSpec("P")
 R = t.TypeVar("R")
 
 
-def _portable_async_sleep(seconds: float) -> t.Awaitable[None]:
-    # If trio is already imported, then importing it is cheap.
-    # If trio isn't already imported, then it's definitely not running, so we
-    # can skip further checks.
-    if "trio" in sys.modules:
-        # If trio is available, then sniffio is too
-        import sniffio
-        import trio
-
-        if sniffio.current_async_library() == "trio":
-            return trio.sleep(seconds)  # noqa: ASYNC105
-    # Otherwise, assume asyncio
-    # Lazy import asyncio as it's expensive (responsible for 25-50% of total import overhead).
-    import asyncio
-
-    return asyncio.sleep(seconds)
 
 
 class AsyncRetrying(BaseRetrying):
@@ -133,34 +117,10 @@ class AsyncRetrying(BaseRetrying):
             else:
                 return do  # type: ignore[no-any-return]
 
-    def _add_action_func(self, fn: t.Callable[..., t.Any]) -> None:
-        self.iter_state.actions.append(_utils.wrap_to_async_func(fn))
 
-    async def _run_retry(self, retry_state: "RetryCallState") -> None:  # type: ignore[override]
-        self.iter_state.retry_run_result = await _utils.wrap_to_async_func(self.retry)(
-            retry_state
-        )
 
-    async def _run_wait(self, retry_state: "RetryCallState") -> None:  # type: ignore[override]
-        if self.wait:
-            sleep = await _utils.wrap_to_async_func(self.wait)(retry_state)
-        else:
-            sleep = 0.0
 
-        retry_state.upcoming_sleep = sleep
 
-    async def _run_stop(self, retry_state: "RetryCallState") -> None:  # type: ignore[override]
-        self.statistics["delay_since_first_attempt"] = retry_state.seconds_since_start
-        self.iter_state.stop_run_result = await _utils.wrap_to_async_func(self.stop)(
-            retry_state
-        )
-
-    async def iter(self, retry_state: "RetryCallState") -> DoAttempt | DoSleep | t.Any:
-        self._begin_iter(retry_state)
-        result = None
-        for action in self.iter_state.actions:
-            result = await action(retry_state)
-        return result
 
     def __iter__(self) -> t.Generator[AttemptManager, None, None]:
         raise TypeError("AsyncRetrying object is not iterable")
@@ -187,18 +147,6 @@ class AsyncRetrying(BaseRetrying):
         wrapped = super().wraps(fn)
         # Ensure wrapper is recognized as a coroutine function.
 
-        @functools.wraps(
-            fn, functools.WRAPPER_ASSIGNMENTS + ("__defaults__", "__kwdefaults__")
-        )
-        async def async_wrapped(*args: t.Any, **kwargs: t.Any) -> t.Any:
-            if not self.enabled:
-                return await fn(*args, **kwargs)  # type: ignore[misc]
-            # Always create a copy to prevent overwriting the local contexts when
-            # calling the same wrapped functions multiple times in the same stack
-            copy = self.copy()
-            async_wrapped.statistics = copy.statistics  # type: ignore[attr-defined]
-            self._local.statistics = copy.statistics
-            return await copy(fn, *args, **kwargs)  # type: ignore[type-var]
 
         # Preserve attributes
         async_wrapped.retry = self  # type: ignore[attr-defined]

@@ -33,14 +33,5 @@ def after_log(
 ) -> typing.Callable[["RetryCallState"], None]:
     """After call strategy that logs to some logger the finished attempt."""
 
-    def log_it(retry_state: "RetryCallState") -> None:
-        fn_name = retry_state.get_fn_name()
-        secs = retry_state.seconds_since_start
-        logger.log(
-            log_level,
-            f"Finished call to '{fn_name}' "
-            f"after {sec_format % secs if secs is not None else '?'}(s), "
-            f"this was the {_utils.to_ordinal(retry_state.attempt_number)} time calling it.",
-        )
 
     return log_it

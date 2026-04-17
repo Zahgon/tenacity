@@ -81,10 +81,6 @@ def get_callback_name(cb: typing.Callable[..., typing.Any]) -> str:
 time_unit_type = int | float | timedelta
 
 
-def to_seconds(time_unit: time_unit_type) -> float:
-    return float(
-        time_unit.total_seconds() if isinstance(time_unit, timedelta) else time_unit
-    )
 
 
 def is_coroutine_callable(call: typing.Callable[..., typing.Any]) -> bool:
@@ -97,13 +93,3 @@ def is_coroutine_callable(call: typing.Callable[..., typing.Any]) -> bool:
     return inspect.iscoroutinefunction(dunder_call)
 
 
-def wrap_to_async_func(
-    call: typing.Callable[..., typing.Any],
-) -> typing.Callable[..., typing.Awaitable[typing.Any]]:
-    if is_coroutine_callable(call):
-        return call
-
-    async def inner(*args: typing.Any, **kwargs: typing.Any) -> typing.Any:
-        return call(*args, **kwargs)
-
-    return inner
