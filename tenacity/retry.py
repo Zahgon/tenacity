@@ -110,6 +110,8 @@ class retry_if_exception_type(retry_if_exception):
         self.exception_types = exception_types
         super().__init__(self._check)
 
+    def _check(self, e: BaseException) -> bool:
+        return isinstance(e, self.exception_types)
 
 
 class retry_if_not_exception_type(retry_if_exception):
@@ -123,6 +125,8 @@ class retry_if_not_exception_type(retry_if_exception):
         self.exception_types = exception_types
         super().__init__(self._check)
 
+    def _check(self, e: BaseException) -> bool:
+        return not isinstance(e, self.exception_types)
 
 
 class retry_unless_exception_type(retry_if_exception):
@@ -136,6 +140,8 @@ class retry_unless_exception_type(retry_if_exception):
         self.exception_types = exception_types
         super().__init__(self._check)
 
+    def _check(self, e: BaseException) -> bool:
+        return not isinstance(e, self.exception_types)
 
     def __call__(self, retry_state: "RetryCallState") -> bool:
         if retry_state.outcome is None:
@@ -231,11 +237,18 @@ class retry_if_exception_message(retry_if_exception):
         self.match = re.compile(match) if match else None
         super().__init__(self._check)
 
+    def _check(self, exception: BaseException) -> bool:
+        if self.message:
+            return self.message == str(exception)
+        assert self.match is not None
+        return bool(self.match.match(str(exception)))
 
 
 class retry_if_not_exception_message(retry_if_exception_message):
     """Retries until an exception message equals or matches."""
 
+    def _check(self, exception: BaseException) -> bool:
+        return not super()._check(exception)
 
     def __call__(self, retry_state: "RetryCallState") -> bool:
         if retry_state.outcome is None:
