@@ -567,6 +567,30 @@ def retry(*dargs: t.Any, **dkw: t.Any) -> t.Any:
     if len(dargs) == 1 and callable(dargs[0]):
         return retry()(dargs[0])
 
+    def wrap(f: t.Callable[P, R]) -> _RetryDecorated[P, R]:
+        if isinstance(f, retry_base):
+            warnings.warn(
+                f"Got retry_base instance ({f.__class__.__name__}) as callable argument, "
+                f"this will probably hang indefinitely (did you mean retry={f.__class__.__name__}(...)?)",
+                stacklevel=2,
+            )
+        r: BaseRetrying
+        sleep = dkw.get("sleep")
+        if _utils.is_coroutine_callable(f) or (
+            sleep is not None and _utils.is_coroutine_callable(sleep)
+        ):
+            r = AsyncRetrying(*dargs, **dkw)
+        elif (
+            tornado
+            and hasattr(tornado.gen, "is_coroutine_function")
+            and tornado.gen.is_coroutine_function(f)
+        ):
+            r = TornadoRetrying(*dargs, **dkw)
+        else:
+            r = Retrying(*dargs, **dkw)
+
+        return r.wraps(f)
+
     return wrap
 
 
