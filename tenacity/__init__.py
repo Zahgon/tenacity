@@ -118,7 +118,6 @@ class IterState:
     is_explicit_retry: bool = False
 
 
-
 class TryAgain(Exception):
     """Always retry the executed function when raised."""
 
@@ -177,7 +176,6 @@ class RetryError(Exception):
     def __init__(self, last_attempt: "Future") -> None:
         self.last_attempt = last_attempt
         super().__init__(last_attempt)
-
 
     def __str__(self) -> str:
         return f"{self.__class__.__name__}[{self.last_attempt}]"
@@ -329,30 +327,31 @@ class BaseRetrying(ABC):
         """
         pass
 
-
     def wraps(self, f: t.Callable[P, R]) -> "_RetryDecorated[P, R]":
         """Wrap a function for retrying.
 
         :param f: A function to wrap for retrying.
         """
 
+        @functools.wraps(
+            f, functools.WRAPPER_ASSIGNMENTS + ("__defaults__", "__kwdefaults__")
+        )
+        def wrapped_f(*args: t.Any, **kw: t.Any) -> t.Any:
+            if not self.enabled:
+                return f(*args, **kw)
+            copy = self.copy()
+            wrapped_f.statistics = copy.statistics  # type: ignore[attr-defined]
+            self._local.statistics = copy.statistics
+            return copy(f, *args, **kw)
 
+        def retry_with(*args: t.Any, **kwargs: t.Any) -> "_RetryDecorated[P, R]":
+            return self.copy(*args, **kwargs).wraps(f)
 
-        # Preserve attributes
         wrapped_f.retry = self  # type: ignore[attr-defined]
         wrapped_f.retry_with = retry_with  # type: ignore[attr-defined]
         wrapped_f.statistics = {}  # type: ignore[attr-defined]
 
         return t.cast("_RetryDecorated[P, R]", wrapped_f)
-
-
-
-
-
-
-
-
-
 
     def __iter__(self) -> t.Generator[AttemptManager, None, None]:
         self.begin()
@@ -471,10 +470,6 @@ class RetryCallState:
             return _utils.get_callback_name(self.fn)
         return str(self.retry_object)
 
-
-
-
-
     def __repr__(self) -> str:
         if self.outcome is None:
             result = "none yet"
@@ -571,7 +566,6 @@ def retry(*dargs: t.Any, **dkw: t.Any) -> t.Any:
     # support both @retry and @retry() as valid syntax
     if len(dargs) == 1 and callable(dargs[0]):
         return retry()(dargs[0])
-
 
     return wrap
 

@@ -53,6 +53,22 @@ P = t.ParamSpec("P")
 R = t.TypeVar("R")
 
 
+def _portable_async_sleep(seconds: float) -> t.Awaitable[None]:
+    # If trio is already imported, then importing it is cheap.
+    # If trio isn't already imported, then it's definitely not running, so we
+    # can skip further checks.
+    if "trio" in sys.modules:
+        # If trio is available, then sniffio is too
+        import sniffio
+        import trio
+
+        if sniffio.current_async_library() == "trio":
+            return trio.sleep(seconds)  # noqa: ASYNC105
+    # Otherwise, assume asyncio
+    # Lazy import asyncio as it's expensive (responsible for 25-50% of total import overhead).
+    import asyncio
+
+    return asyncio.sleep(seconds)
 
 
 class AsyncRetrying(BaseRetrying):
@@ -117,11 +133,6 @@ class AsyncRetrying(BaseRetrying):
             else:
                 return do  # type: ignore[no-any-return]
 
-
-
-
-
-
     def __iter__(self) -> t.Generator[AttemptManager, None, None]:
         raise TypeError("AsyncRetrying object is not iterable")
 
@@ -145,10 +156,18 @@ class AsyncRetrying(BaseRetrying):
 
     def wraps(self, fn: t.Callable[P, R]) -> _RetryDecorated[P, R]:
         wrapped = super().wraps(fn)
-        # Ensure wrapper is recognized as a coroutine function.
 
+        @functools.wraps(
+            fn, functools.WRAPPER_ASSIGNMENTS + ("__defaults__", "__kwdefaults__")
+        )
+        async def async_wrapped(*args: t.Any, **kwargs: t.Any) -> t.Any:
+            if not self.enabled:
+                return await fn(*args, **kwargs)  # type: ignore[misc]
+            copy = self.copy()
+            async_wrapped.statistics = copy.statistics  # type: ignore[attr-defined]
+            self._local.statistics = copy.statistics
+            return await copy(fn, *args, **kwargs)  # type: ignore[type-var]
 
-        # Preserve attributes
         async_wrapped.retry = self  # type: ignore[attr-defined]
         async_wrapped.retry_with = wrapped.retry_with  # type: ignore[attr-defined]
         async_wrapped.statistics = {}  # type: ignore[attr-defined]
