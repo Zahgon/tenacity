@@ -81,6 +81,10 @@ def get_callback_name(cb: typing.Callable[..., typing.Any]) -> str:
 time_unit_type = int | float | timedelta
 
 
+def to_seconds(time_unit: time_unit_type) -> float:
+    return float(
+        time_unit.total_seconds() if isinstance(time_unit, timedelta) else time_unit
+    )
 
 
 def is_coroutine_callable(call: typing.Callable[..., typing.Any]) -> bool:
@@ -91,5 +95,3 @@ def is_coroutine_callable(call: typing.Callable[..., typing.Any]) -> bool:
     partial_call = isinstance(call, functools.partial) and call.func
     dunder_call = partial_call or getattr(call, "__call__", None)  # noqa: B004
     return inspect.iscoroutinefunction(dunder_call)
-
-
